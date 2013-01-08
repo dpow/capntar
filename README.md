@@ -3,12 +3,13 @@ capntar
 
 Cap'n Tar is back, and he's conquering the NES! With Wax!
 
-## WIP
+# WIP
 
 This game is a work in progress in the early stages of planning & design, and will only be updated infrequently until the basic game is satisfactory.
 
 Build
 -----
+
 Make sure to have the cc65 compiler installed and on your $PATH, and issue the following command(s) in your directory of choice (you can also use the pre-compiled version in `bin/capntar.nes`):
 
 UNIX-like systems:  
