@@ -39,7 +39,7 @@ BSD 3-Clause License. See `LICENSE` for details.
 
 ### Credits
 
-Cap'n Tar and all other characters created by Caleb Powell, all rights reserved.
+Cap'n Tar and all other Characters created by Caleb Powell, all rights reserved. The Characters are not covered under the LICENSE, and may not be re-used or otherwise reproduced without the express written consent of Caleb Powell.
 
 Cap'n Tar Game designed and created by Caleb Powell and Dylan Powell, Copyright (c) 2012-2013, all rights reserved.
 Cap'n Tar, its Designers and Creators, and any content herein are in no way affiliated with, endorsed by, or endorse Nintendo, the NES, or anything else remotely related, and neither ask for nor receive Revenue nor Compensation for this project. This Game was solely created for the purposes of self-education and self-enjoyment.
