@@ -1,5 +1,5 @@
-capntar
-=======
+Cap'n Tar
+=========
 
 Cap'n Tar is back, and he's conquering the NES! With Wax!
 
@@ -10,9 +10,9 @@ This game is a work in progress in the early stages of planning & design, and wi
 Build
 -----
 
-Make sure to have the cc65 compiler installed and on your $PATH, and issue the following command(s) in your directory of choice (you can also use the pre-compiled version in `bin/capntar.nes`):
+Make sure to have the `cc65` compiler suite installed and on your $PATH, and issue the following command(s) in your directory of choice (you can also use the pre-compiled version in `bin/capntar.nes`):
 
-UNIX-like systems:  
+UNIX-like systems (& Windows with `make` installed):  
 
               $ git clone https://github.com/dpow/capntar.git && cd capntar/
               $ make
@@ -24,11 +24,16 @@ Windows/DOS:
               > ca65 -t nes capntar.asm -o capntar.o
               > ld65 -t nes capntar.o -o capntar.nes
 
+### Dependencies
+* `cc65` - "the 6502 compiler":  compiler suite targeting 65(C)02-based platforms. Includes an assembler (`ca65`), linker (`ld65`), C compiler (`cc65`), disassembler (`da65`), and other handy tools. Available free at http://www.cc65.org/.
+* `GnuWin32` - port of GNU tools to modern Windows systems. If you're stuck on Windows, consider installing `make`, which will "make" compiling and cleaning much easier. Obtain from http://gnuwin32.sourceforge.net/. A handy auto-downloader-installer is available at http://sourceforge.net/projects/getgnuwin32/.
+* `fceux` - excellent NES emulator with many debugging features. Other emulators will probably work just fine, but this is the one the game is being consistently tested against. http://www.fceux.com/web/home.html
+
 Play!
 -----
-Open your NES emulator of choice and load the capntar.nes ROM file! If you prefer to use the command line:
+Open your NES emulator of choice and load the capntar.nes ROM file! If you prefer to use the command line, enter the following from the `capntar/` directory:
 
-CLI:  `fceux capntar.nes`
+CLI:  `fceux bin/capntar.nes`
 
 Legal
 -----
