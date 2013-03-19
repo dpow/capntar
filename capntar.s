@@ -72,29 +72,22 @@ reset:
 game_state 		= $0300 ; Master game states
 start_down 		= $0301 ; Whether or not start was down last frame
 
-; Player data - convert from RPG to platformer-style
-player_lvl		= $0302 ; Player level
-player_hpt		= $0302 ; Player total hitpoints
-player_hpc		= $0303 ; Player current hitpoints
-player_str		= $0304 ; Player strength / toughness
-player_agi		= $0305 ; Player agility
-player_int		= $0306 ; Player intelligence
+player_hpt		= $0302	; Player hitpoints
 
-enemy_hpt		= $0307 ; Enemy total hitpoints
-
-score 			= $03ff ; Score in BCD form (8-bytes)
+score 			= $0308 ; Score in BCD form (8-bytes)
 
 ; Player position
 player_x = $0203
 player_y = $0200
 
 ; Enemy position
-enemy_x = $0207
-enemy_y = $0205
+;enemy_x = $0207
+;enemy_y = $0205
 
-; Constants (zero-page memory values or literal constants?)
-PLAYER_LVL		= $d3 ; Player starting level (1)
-PLAYER_HPT_INIT		= $d4 ; Player starting hitpoints
+; Constants (zero-page memory values)
+ATTACK_DELAY	= $0b	; Delay in player's attack - decreases with better weapons
+JUMP_DELAY	= $1b	; Delay in player's jump - decreases with better weapons
+PLAYER_HPT_MAX	= $2b	; Player max hitpoints
 
 ; Game States
 .enum GameState
@@ -104,6 +97,14 @@ PLAYER_HPT_INIT		= $d4 ; Player starting hitpoints
 	LOSE_LIFE
 	PAUSED
 	GAMEOVER
+.endenum
+
+; Player states
+.enum PlayerState
+	ALIVE
+	HIT
+	DYING
+	DEAD
 .endenum
 
 
