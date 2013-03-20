@@ -355,7 +355,12 @@ change_state:
 
 ;;;;;;;;;;;;;; Pattern Table (CHR-ROM) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "CHARS"
-;.include "include/players.s"		; $00 - $3f
+;.include "include/title.s"		; $00 - $??
+;.include "include/blocks.s"		; $?? - $??
+;.include "include/capn.s"		; $?? - $??
+;.include "include/enemies.s"		; $?? - $??
+;.include "include/bosses.s"		; $?? - $??
+;.include "include/summerman.s"		; $?? - $??
 
 
 ;;;;;;;;;;;;;; Vectors ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
