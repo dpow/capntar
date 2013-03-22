@@ -64,6 +64,83 @@ reset:
 	pla
 .endmacro
 
+.macro vram_addr address
+	pha
+	lda #.HIBYTE(address)
+	sta $2006
+	lda #.LOBYTE(address)
+	sta $2006
+	pla
+.endmacro
+
+.macro strobe
+	pha
+	lda #$01
+	sta $4016
+	lda #$00
+	sta $4016
+	pla
+.endmacro
+
+.macro tile add_x, add_y
+	lda ball_x
+	adc add_x
+	sta $00
+	lda ball_y
+	adc add_y
+	sta $01
+	jsr get_tile
+.endmacro
+
+.macro addr label
+	pha
+	lda #.LOBYTE(label)
+	sta $00
+	lda #.HIBYTE(label)
+	sta $01
+	pla
+.endmacro
+
+.macro addr2 l1, l2
+	pha
+	lda #.LOBYTE(l1)
+	sta $00
+	lda #.HIBYTE(l1)
+	sta $01
+	lda #.LOBYTE(l2)
+	sta $02
+	lda #.HIBYTE(l2)
+	sta $03
+	pla
+.endmacro
+
+.macro load_attrs label
+.scope
+	vram #$23, #$c0
+	ldx #$00
+@__load_attrs_loop:	
+	lda label, x
+	sta $2007
+	inx
+	cpx #$40
+	bne @__load_attrs_loop
+.endscope
+.endmacro
+
+.macro block_row hi, lo
+.scope
+	vram hi, lo
+	ldx #$0e
+@__block_row_loop:
+	lda #$42
+	sta $2007
+	lda #$43
+	sta $2007
+	dex
+	bne @__block_row_loop
+.endscope
+.endmacro
+
 
 ;;;;;;;;;;;;;; Global Variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
