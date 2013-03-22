@@ -437,6 +437,7 @@ change_state:
 ;.include "include/capn.s"		; $?? - $??
 ;.include "include/enemies.s"		; $?? - $??
 ;.include "include/bosses.s"		; $?? - $??
+;.include "include/concarne.s"		; $?? - $??
 ;.include "include/summerman.s"		; $?? - $??
 
 
