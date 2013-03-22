@@ -19,9 +19,7 @@
 
 .segment "CODE"
 
-; Use this routine as a ".include" if you don't want it in the main file
 reset:
-;.include "include/reset.s"
 	sei			; Disable IRQs
 	cld			; Disable decimal mode 
 	ldx #$40
