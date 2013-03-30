@@ -37,7 +37,7 @@ CLI:  `fceux bin/capntar.nes`
 
 Milestones
 ----------
-~~* Define basic game-state and player logic~~
+* ~~Define basic game-state and player logic~~
 * Design & configure Title Screen
 * Design sprites & level blocks
 * Convert sprites & level blocks to pattern tables
