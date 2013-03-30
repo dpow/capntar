@@ -35,6 +35,14 @@ Open your NES emulator of choice and load the capntar.nes ROM file! If you prefe
 
 CLI:  `fceux bin/capntar.nes`
 
+Milestones
+----------
+~~* Define basic game-state and player logic~~
+* Design & configure Title Screen
+* Design sprites & level blocks
+* Convert sprites & level blocks to pattern tables
+* Configure basic empty level to test sprites & player actions
+
 Legal
 -----
 
