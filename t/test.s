@@ -22,7 +22,7 @@ loop:   lda iostatus
         and #$10       ; Is the tx register empty?
         beq loop       ; No, wait for it to empty
         lda string,x   ; Otherwise, load the string pointer
-        beq init       ; If the char is 0, re-init
+        ;beq init       ; If the char is 0, re-init
         sta iobase     ; Otherwise, transmit
 
         inx            ; Increment string pointer.

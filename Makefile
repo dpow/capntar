@@ -23,7 +23,6 @@ all:
 # assemble program for testing individual  
 # subroutines separately in Symon 6502 simulator
 test: 
-	#$(CL) -t none -o test.prg t/test.s
 	$(CL) $(CFLAGS_SYMON) $(SOURCES_SYMON) 
 
 clean:

@@ -68,16 +68,6 @@ PLAYER_JUMP_DEL		= 3			; Delay before player jumps
 
 PLAYER_HPT_MAX		= 5	
 
-; Bits in 'buttons' are ordered: A, B, select, start, up, down, left, right.
-BUTTON_A_PRESSED	= %10000000
-BUTTON_B_PRESSED	= %01000000
-BUTTON_SE_PRESSED	= %00100000	; Select
-BUTTON_ST_PRESSED	= %00010000	; Start 
-BUTTON_UP_PRESSED	= %00001000
-BUTTON_DN_PRESSED	= %00000100
-BUTTON_LE_PRESSED	= %00000010
-BUTTON_RT_PRESSED	= %00000001
-
 ; Variables
 game_state:			.res 1 		; Current master game state
 score:	 			.res 8 		; Score in BCD form (8-bytes)
@@ -153,9 +143,7 @@ player_y:			.res 1 		; Player y-coordinate
 	lda #$01 		; Fetch controller data
 	sta $4016
 	lda #$00
-	sta $4016
-
-	; Now controller status is available in $4016.
+	sta $4016		; Now controller status is available in $4016.
 
 	ldx #$08 				; Use X as our bit rotation counter.
 @__dump_bits_loop:
@@ -272,7 +260,7 @@ main:
 	jsr load_palette
 
 	; Set the game state to the title screen
-	lda #GameState::TITLE
+	lda #GameState::PLAYING
 	sta $00 		; Param for change_state - reflects initial game state
 	jsr change_state
 
@@ -287,23 +275,11 @@ forever:
 game_loop:
 	lda game_state
 
-@title:	bne @play
-	jsr title_loop
-	jmp cleanup
-
-@play:	cmp #GameState::PLAYING
+@play:	
+	cmp #GameState::PLAYING
 	bne @pause
 	jsr play_loop
 	jmp cleanup
-
-@pause:	cmp #GameState::PAUSED
-	bne @over
-	jsr pause_loop
-	jmp cleanup
-
-@over:  cmp #GameState::GAMEOVER
-	bne cleanup
-	jsr game_over_loop
 
 cleanup:
 	lda #$00 		; Draw sprites
@@ -317,182 +293,300 @@ cleanup:
 ;;;;;;;;;;;;;; Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;
+; Game loop code for the main game
+;
+play_loop:
+	strobe 		; Strobe the controller
+
+	; Check to see which butons, if any, have been pressed
+
+	; A - Gets the ball moving at the start of the game
+button_a:
+	lda #$01
+	and $4016
+	beq button_start
+
+	lda ball_moving
+	bne button_start
+
+	lda #$01
+	sta ball_moving
+
+
+	; Start - Pauses the game
+button_start:
+	lda $4016 ; Skip B
+	lda $4016 ; Skip Select
+	
+	lda start_down
+	bne @ignore
+
+	lda #$01
+	and $4016
+	beq button_left
+
+	lda #1
+	sta start_down
+
+	lda #GameState::PAUSED
+	sta $00
+	jsr change_state
+	rts
+
+@ignore:
+	lda #$01
+	and $4016
+	sta start_down
+
+	
+button_left:
+	lda $4016 ; Skip Up
+	lda $4016 ; Skip Down
+
+	lda #$01
+	and $4016
+	beq button_right
+
+	lda $0207
+	cmp #$10
+	beq check_palette_timer
+
+	ldx #$02
+	lda ball_moving
+	beq @move_with_ball
+
+@move:
+	dec $0207
+	dec $020b
+	dec $020f
+	dec $0213
+	dex
+	bne @move
+	jmp @done_left
+
+@move_with_ball:
+	dec $0207
+	dec $020b
+	dec $020f
+	dec $0213
+	dec $0203
+	dex
+	bne @move_with_ball
+
+@done_left:
+	jmp check_palette_timer
+
+button_right:
+	lda #$01
+	and $4016
+	beq check_palette_timer
+
+	lda $0213
+	cmp #$e6
+	beq check_palette_timer
+
+	ldx #$02
+	lda ball_moving
+	beq @move_with_ball
+
+@move:
+	inc $0207
+	inc $020b
+	inc $020f
+	inc $0213
+	dex
+	bne @move
+	jmp @done_right
+
+@move_with_ball:
+	inc $0207
+	inc $020b
+	inc $020f
+	inc $0213
+	inc $0203
+	dex
+	bne @move_with_ball
+
+@done_right:
+
+
+check_palette_timer:
+	inc palette_timer
+	ldx palette_timer
+	cpx #PALETTE_DELAY
+	beq @cycle_palette
+	jmp @done
+	
+@cycle_palette:
+	ldx #$00
+	stx palette_timer
+
+	inc paddle_state
+	lda paddle_state
+	and #$07
+	sta paddle_state
+	tax
+	vram #$3f, #$12
+	lda paddle_cycle, x
+	sta $2007
+@done:
+
+
+check_hit:
+	bit $2002
+	bvs check_x
+	jmp check_paddle
+
+check_x:
+	lda ball_dx
+	bne check_right
+
+check_left:
+	; (x, y+4)
+	tile #0, #4
+	cmp #$ff
+	beq check_y
+	jsr block_hit
+	lda #1
+	sta ball_dx
+	jmp check_y
+
+check_right:
+	; (x+7, y+3)
+	tile #7, #3
+	cmp #$ff
+	beq check_y
+	jsr block_hit
+	lda #0
+	sta ball_dx
+
+check_y:
+	lda ball_dy
+	bne check_down
+
+check_up:
+	; (x+3, y)
+	tile #3, #0
+	cmp #$ff
+	beq check_paddle
+	jsr block_hit
+	lda #1
+	sta ball_dy
+	jmp check_paddle
+
+check_down:
+	; (x+4, y+7)
+	tile #4, #7
+	cmp #$ff
+	beq check_paddle
+	jsr block_hit
+	lda #0
+	sta ball_dy
+
+check_paddle:
+	lda ball_y
+	cmp #(PADDLE_Y - $08)
+	bne check_lose
+
+	; ball_x >= paddle_x
+	clc
+	lda ball_x
+	adc #4
+	cmp paddle_x
+	bcc check_lose
+
+	; paddle_x + 35 >= ball_x
+	clc
+	lda paddle_x
+	adc #35
+	cmp ball_x
+	bcc check_lose
+
+	; The paddle is in the right spot!
+	lda #0
+	sta ball_dy
+
+check_lose:
+	lda ball_y
+	cmp #$f0
+	bcc move_ball
+
+	lda #GameState::LOSE_LIFE
+	sta $00
+	jsr change_state
+	rts
+
+move_ball:
+	lda ball_moving
+	beq @done_y
+
+	; Move the ball in the x-coordinate
+	lda ball_dx
+	bne @move_right
+	dec $0203
+	jmp @done_x
+@move_right:
+	inc $0203
+@done_x:
+	
+	; Move the ball in the y-coordinate
+	lda ball_dy
+	bne @move_down
+	dec $0200
+	jmp @done_y
+@move_down:
+	inc $0200
+@done_y:
+
+	rts
+
+
+;
 ; Sets the game state
 ;
 ; Params:
 ;	$00 - The state to set
 ;
-change_state:
-	; Store the new game state
-	lda $00
-	sta game_state
-
-@title:	cmp #GameState::TITLE
-	bne @new_game
-
-	; Disable NMI, sprites, and background
-	lda #$00
-	sta $2000
-	sta $2001
-
-	; Load the title screen
-	jsr clear_sprites
-	jsr draw_title
-
-	; Wait for VBLANK
-@wait:	bit $2002
-	bpl @wait
-
-	; Enable NMI
-	lda #%10000000
-	sta $2000
-
-	; Enable background
-	lda #%00001000
-	sta $2001
-
-	jmp @return
-
-@new_game:
-	cmp #GameState::NEW
-	bne @lose_life
-
-	; Disable NMI, sprites, and background
-	lda #$00
-	sta $2000
-	sta $2001
-
-	; Load sprites for main game play
-	jsr clear_sprites
-	jsr load_sprites
-
-	; Reset the palette timer and paddle palette state
-	lda #$00
-	sta palette_timer
-	sta paddle_state
-
-	; Reset the ball dx, dy
-	sta ball_dx
-	sta ball_dy
-
-	; Reset ball moving and game paused
-	sta ball_moving
-
-	; Reset lives to 3
-	lda #3
-	sta lives
-
-	; Reset score to 0
-	ldx #0
-	lda #0
-@score:	sta score, x
-	inx
-	cpx #8
-	bne @score
-
-	; Set the game state to "playing"
-	lda #GameState::PLAYING
-	sta game_state
-
-	; Draw the game board
-	jsr draw_board
-
-	; Wait for VBLANK
-@wait2:	bit $2002
-	bpl @wait2
-
-	; Enable NMI, sprites and background
-	lda #%10000000
-	sta $2000
-	lda #%00011110
-	sta $2001
-
-	jmp @return
-
-@lose_life:
-	cmp #GameState::LOSE_LIFE
-	bne @playing
-
-	; Disable NMI
-	lda #$00
-	sta $2000
-
-	; Decrement Lives
-	dec lives
-	ldx lives
-	bne @game_continue
-
-	; Lives == 0, game is now over
-	lda #GameState::GAMEOVER
-	sta game_state
-	jmp @game_over
-
-@game_continue:
-	; Draw the update lives to the board
-	jsr draw_lives
-
-	; Reset ball and paddle position
-	lda #$00
-	sta ball_dx
-	sta ball_dy
-	sta ball_moving
-	jsr load_sprites
-
-	; Jump into the "playing state"
-	lda #GameState::PLAYING
-	sta game_state
-
-	; Enable NMI
-	lda #%10000000
-	sta $2000
-
-	jmp @return
-
-@playing:
-	cmp #GameState::PLAYING
-	bne @paused
-
-	; Swtich to color mode
-	lda #%00011110
-	sta $2001
-
-	jmp @return
-
-@paused:
-	cmp #GameState::PAUSED
-	bne @game_over
-
-	; Switch to monochrome mode
-	lda #%00011111
-	sta $2001
-
-	jmp @return
-
-@game_over:
-	; Disable NMI, sprites, and background
-	lda #$00
-	sta $2000
-	sta $2001
-
-	; Draw the game over screen
-	jsr draw_game_over
-
-	; Wait for vblank
-@wait3:	bit $2002
-	bpl @wait3
-
-	; Enable the background and NMI
-	lda #%10000000
-	sta $2000
-	lda #%00001000
-	sta $2001
-
-@return:
-	rts
+;change_state:
+;	; Store the new game state
+;	lda $00
+;	sta game_state
+;
+;@title:	cmp #GameState::TITLE
+;	bne @new_game
+;
+;@return:
+;	rts
 
 
 ;;;;;;;;;;;;;; Drawing Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; 
+; Clears sprite memory 
+;
+clear_sprites:
+	lda #$ff
+	ldx #$00
+@clear:	sta $0200, x
+	inx
+	bne @clear
+	rts
+
+
+;
+; Clears nametable memory
+;
+clear_nametable:
+	ldx #$00
+	ldy #$04
+	lda #$FF
+	vram #$20, #$00
+@loop:	sta $2007
+	inx
+	bne @loop
+	dey
+	bne @loop
+	rts
 
 
 ;;;;;;;;;;;;;; Lookup & Math Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -701,13 +795,14 @@ bcd_zero:	.byte 0,0,0,0,0,0,0,0
 
 ;;;;;;;;;;;;;; Pattern Table (CHR-ROM) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "CHARS"
-;.include "include/title.s"		; $00 - $??
+;.include "include/title.s"			; $00 - $??
 ;.include "include/blocks.s"		; $?? - $??
-;.include "include/capn.s"		; $?? - $??
+;.include "include/capn.s"			; $?? - $??
 ;.include "include/enemies.s"		; $?? - $??
 ;.include "include/bosses.s"		; $?? - $??
 ;.include "include/concarne.s"		; $?? - $??
 ;.include "include/summerman.s"		; $?? - $??
+.include "include/font.s"			; $00 - $65 (101 tiles)
 
 
 ;;;;;;;;;;;;;; Vectors ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
