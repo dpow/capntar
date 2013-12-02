@@ -162,20 +162,20 @@ player_y:			.res 1 		; Player y-coordinate
 
 
 ;
-; Add delta-x and delta-y values to
-; a character's current position.
+; Set the params for finding the tile in 
+; nametable at point (x, y).
 ; 
 ; Params: 
-;	add_x - value to add to current X position.
-;	add_y - value to add to current Y position.
+;	add_x - value to add to X position.
+;	add_y - value to add to Y position.
 ;
 .macro tile add_x, add_y
 	lda ball_x
 	adc add_x
-	sta $00
+	sta $00 			; Param for X-coordinate in get_tile
 	lda ball_y
 	adc add_y
-	sta $01
+	sta $01 			; Param for Y-coordinate in get_tile
 	jsr get_tile
 .endmacro
 
@@ -238,6 +238,9 @@ player_y:			.res 1 		; Player y-coordinate
 
 ;
 ; Get the block row. (??? - verify)
+; (Not sure whether "block_row" refers to
+;  row # of blocks that are hit by ball or
+;  a "block" or tile in namespace or pattern table.)
 ;
 .macro block_row hi, lo
 .scope
@@ -277,7 +280,7 @@ game_loop:
 
 @play:	
 	cmp #GameState::PLAYING
-	bne @pause
+	;bne @pause
 	jsr play_loop
 	jmp cleanup
 
@@ -298,245 +301,14 @@ cleanup:
 play_loop:
 	strobe 		; Strobe the controller
 
-	; Check to see which butons, if any, have been pressed
-
-	; A - Gets the ball moving at the start of the game
+	; A - Make the Cap'n jump
 button_a:
-	lda #$01
-	and $4016
-	beq button_start
-
-	lda ball_moving
-	bne button_start
-
-	lda #$01
-	sta ball_moving
-
-
-	; Start - Pauses the game
-button_start:
-	lda $4016 ; Skip B
-	lda $4016 ; Skip Select
+	lda buttons
+	and #%10000000
+	beq @no_button_pressed
 	
-	lda start_down
-	bne @ignore
 
-	lda #$01
-	and $4016
-	beq button_left
-
-	lda #1
-	sta start_down
-
-	lda #GameState::PAUSED
-	sta $00
-	jsr change_state
-	rts
-
-@ignore:
-	lda #$01
-	and $4016
-	sta start_down
-
-	
-button_left:
-	lda $4016 ; Skip Up
-	lda $4016 ; Skip Down
-
-	lda #$01
-	and $4016
-	beq button_right
-
-	lda $0207
-	cmp #$10
-	beq check_palette_timer
-
-	ldx #$02
-	lda ball_moving
-	beq @move_with_ball
-
-@move:
-	dec $0207
-	dec $020b
-	dec $020f
-	dec $0213
-	dex
-	bne @move
-	jmp @done_left
-
-@move_with_ball:
-	dec $0207
-	dec $020b
-	dec $020f
-	dec $0213
-	dec $0203
-	dex
-	bne @move_with_ball
-
-@done_left:
-	jmp check_palette_timer
-
-button_right:
-	lda #$01
-	and $4016
-	beq check_palette_timer
-
-	lda $0213
-	cmp #$e6
-	beq check_palette_timer
-
-	ldx #$02
-	lda ball_moving
-	beq @move_with_ball
-
-@move:
-	inc $0207
-	inc $020b
-	inc $020f
-	inc $0213
-	dex
-	bne @move
-	jmp @done_right
-
-@move_with_ball:
-	inc $0207
-	inc $020b
-	inc $020f
-	inc $0213
-	inc $0203
-	dex
-	bne @move_with_ball
-
-@done_right:
-
-
-check_palette_timer:
-	inc palette_timer
-	ldx palette_timer
-	cpx #PALETTE_DELAY
-	beq @cycle_palette
-	jmp @done
-	
-@cycle_palette:
-	ldx #$00
-	stx palette_timer
-
-	inc paddle_state
-	lda paddle_state
-	and #$07
-	sta paddle_state
-	tax
-	vram #$3f, #$12
-	lda paddle_cycle, x
-	sta $2007
-@done:
-
-
-check_hit:
-	bit $2002
-	bvs check_x
-	jmp check_paddle
-
-check_x:
-	lda ball_dx
-	bne check_right
-
-check_left:
-	; (x, y+4)
-	tile #0, #4
-	cmp #$ff
-	beq check_y
-	jsr block_hit
-	lda #1
-	sta ball_dx
-	jmp check_y
-
-check_right:
-	; (x+7, y+3)
-	tile #7, #3
-	cmp #$ff
-	beq check_y
-	jsr block_hit
-	lda #0
-	sta ball_dx
-
-check_y:
-	lda ball_dy
-	bne check_down
-
-check_up:
-	; (x+3, y)
-	tile #3, #0
-	cmp #$ff
-	beq check_paddle
-	jsr block_hit
-	lda #1
-	sta ball_dy
-	jmp check_paddle
-
-check_down:
-	; (x+4, y+7)
-	tile #4, #7
-	cmp #$ff
-	beq check_paddle
-	jsr block_hit
-	lda #0
-	sta ball_dy
-
-check_paddle:
-	lda ball_y
-	cmp #(PADDLE_Y - $08)
-	bne check_lose
-
-	; ball_x >= paddle_x
-	clc
-	lda ball_x
-	adc #4
-	cmp paddle_x
-	bcc check_lose
-
-	; paddle_x + 35 >= ball_x
-	clc
-	lda paddle_x
-	adc #35
-	cmp ball_x
-	bcc check_lose
-
-	; The paddle is in the right spot!
-	lda #0
-	sta ball_dy
-
-check_lose:
-	lda ball_y
-	cmp #$f0
-	bcc move_ball
-
-	lda #GameState::LOSE_LIFE
-	sta $00
-	jsr change_state
-	rts
-
-move_ball:
-	lda ball_moving
-	beq @done_y
-
-	; Move the ball in the x-coordinate
-	lda ball_dx
-	bne @move_right
-	dec $0203
-	jmp @done_x
-@move_right:
-	inc $0203
-@done_x:
-	
-	; Move the ball in the y-coordinate
-	lda ball_dy
-	bne @move_down
-	dec $0200
-	jmp @done_y
-@move_down:
-	inc $0200
-@done_y:
+@no_button_pressed:
 
 	rts
 
@@ -559,29 +331,36 @@ move_ball:
 ;	rts
 
 
+;
+;
+
+
+
 ;;;;;;;;;;;;;; Drawing Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; 
-; Clears sprite memory 
+; Clear sprite memory 
 ;
 clear_sprites:
 	lda #$ff
 	ldx #$00
-@clear:	sta $0200, x
+@clear:	
+	sta $0200, x
 	inx
 	bne @clear
 	rts
 
 
 ;
-; Clears nametable memory
+; Clear nametable memory
 ;
 clear_nametable:
 	ldx #$00
 	ldy #$04
 	lda #$FF
 	vram #$20, #$00
-@loop:	sta $2007
+@loop:	
+	sta $2007
 	inx
 	bne @loop
 	dey
@@ -589,140 +368,16 @@ clear_nametable:
 	rts
 
 
+;
+; Draw off-screen part of level
+;
+
+
+
 ;;;;;;;;;;;;;; Lookup & Math Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Performs a 16-bit arithmetic shift left.
-; 
-; Params:
-; 	$00 - Low byte of the 16-bit value operand
-; 	$01 - High byte of the 16-bit value operand
-; 	$02 - Shift operand
-;
-; Return:
-; 	$00 - The low byte of the result
-;	$01 - The high byte of the result
-asl16:
-	ldx $02
-@loop:	asl $01
-	asl $00
-	bcc @cont
-	inc $01
-@cont:	dex
-	bne @loop
-	rts
-
-
-; Performs an add with two 16-bit operands storing
-; the result in the first operand.
-;
-; Params:
-; 	$00 - Low byte of the first operand
-; 	$01 - High byte of the first operand
-; 	$02 - Low byte of the second operand
-; 	$03 - High byte of the second operand
-;
-; Return:
-; 	$00 - The low byte of the result
-;	$01 - The high byte of the result
-add16:
-	clc
-	lda $02
-	adc $00
-	sta $00
-	lda $03
-	adc $01
-	sta $01
-	rts
-
-
-;
-; Adds two 8-byte BCD values and stores the result in the first.
-;
-; Params:
-;	$00 - Low byte to address of first operand
-;	$01 - High byte to address of the first operand
-;	$02 - Low byte to address of second operand
-;	$03 - High byte to the address of the second operand
-;
-bcd_add:
-	clc
-	ldy #0
-@loop:	lda ($00), y
-	adc ($02), y
-	cmp #10
-	bne @skip
-	adc #5
-	and #$0f
-	sta ($00), y
-	iny
-	cpy #8
-	sec
-	bne @loop
-@skip:	sta ($00), y
-	iny
-	cpy #8
-	bne @loop
-	rts
-
-
-; Find the tile in the nametable at the point (x, y).
-;
-; Params:
-; 	$00 - x-coordinate
-;	$01 - y-coordinate
-;
-; Return:
-; 	A   - The value of the tile at that address
-;	$00 - The low byte of the address
-; 	$01 - The high byte of the address
-get_tile:
-	; Nab the x value and hold onto it
-	ldy $00 
-
-	; Calculate the offset into VRAM
-	; Tile(x, y) = ($00, $01) = (y / 8) * 32 + (x / 8)
-
-	; (y / 8) * 32 = (y & #$f8) << 2
-	lda $01
-	and #$f8
-	sta $00
-	lda #0
-	sta $01
-	lda #2
-	sta $02
-	jsr asl16
-
-	; (x / 8)
-	tya
-	lsr
-	lsr
-	lsr
-
-	; [(y/8) * 32] + (x/8)
-	sta $02
-	lda #0
-	sta $03
-	jsr add16
-
-
-	; Find that tile in VRAM
-	lda $01
-	adc #$20
-	sta $2006
-	sta $01
-
-	lda $00
-	sta $2006
-
-	lda $2007
-	lda $2007
-
-	rts
 
 
 ;;;;;;;;;;;;;; Palettes, Nametables, etc. ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; All palettes & nametables are placeholders for the time being!
 
 palette:
 	; Background
@@ -738,7 +393,7 @@ palette:
 	.byte $0f, $00, $00, $00
 
 sprites:
-	; Ball (sprite 0)
+	; Cap'n Tar (sprite 0)
 	.byte (PADDLE_Y - $08), $4a, %00000001, $7c
 
 	; Paddle
@@ -750,27 +405,7 @@ sprites:
 	; Lives Row Ball
 	.byte $07, $4a, %00000001, $0e
 
-title_attr:
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $55, $55, $55, $55, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00
-
-game_over_attr:
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-	.byte $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
-
-board_attr:
+level_attr:
 	.byte $0f, $0f, $0f, $0f, $0f, $0f, $0f, $0f
 	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
 	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
@@ -784,19 +419,17 @@ board_attr:
 ;;;;;;;;;;;;;; Strings ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 title_text:		.asciiz "CAP'N TAR" 
-score_text:		.asciiz "SCORE:"
 game_over_text:	.asciiz "GAME OVER"
 
 
 ;;;;;;;;;;;;;; BCD Constants ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-bcd_zero:	.byte 0,0,0,0,0,0,0,0
+;bcd_zero:	.byte 0,0,0,0,0,0,0,0
 
 
 ;;;;;;;;;;;;;; Pattern Table (CHR-ROM) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "CHARS"
 ;.include "include/title.s"			; $00 - $??
-;.include "include/blocks.s"		; $?? - $??
 ;.include "include/capn.s"			; $?? - $??
 ;.include "include/enemies.s"		; $?? - $??
 ;.include "include/bosses.s"		; $?? - $??
