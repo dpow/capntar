@@ -27,7 +27,7 @@ Windows/DOS:
 ### Dependencies
 * `cc65` - "the 6502 compiler":  compiler suite targeting 65(C)02-based platforms. Includes an assembler (`ca65`), linker (`ld65`), C compiler (`cc65`), disassembler (`da65`), and other handy tools. Available free at http://www.cc65.org/.
 * `GnuWin32` - port of GNU tools to modern Windows systems. If you're stuck on Windows, consider installing `make`, which will "make" compiling and cleaning much easier. Obtain from http://gnuwin32.sourceforge.net/. A handy auto-downloader-installer is available at http://sourceforge.net/projects/getgnuwin32/.
-* `fceux` - excellent NES emulator with many debugging features. Other emulators will probably work just fine, but this is the one the game is being consistently tested against. http://www.fceux.com/web/home.html
+* `fceux` - excellent NES emulator with many debugging features. Other emulators will probably work just fine, but this is the one the game is being consistently tested against. NEStopia is also a good one, especially if you're on OSX. http://www.fceux.com/web/home.html
 
 Play!
 -----
@@ -37,7 +37,8 @@ CLI:  `fceux bin/capntar.nes`
 
 Milestones
 ----------
-* ~~Define basic game-state and player logic~~
+* ~~Define basic game-state logic~~
+* Make a simple test / debug screen where Cap'n Tar jumps & moves on player input
 * Design & configure Title Screen
 * Design sprites & level blocks
 * Convert sprites & level blocks to pattern tables
