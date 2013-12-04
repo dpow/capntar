@@ -109,11 +109,10 @@ player_y:			.res 1 		; Player y-coordinate
 
 
 ;
-; Load high and low bytes into VRAM,
-; using a value stored at a specific address.
+; Load a value stored at a specific address into VRAM.
 ;
 ; Params:
-;	address - the address to retrieve values from
+;	address - the address of value to load into VRAM
 ;
 .macro vram_addr address 
 	pha
@@ -145,15 +144,15 @@ player_y:			.res 1 		; Player y-coordinate
 	lda #$00
 	sta $4016		; Now controller status is available in $4016.
 
-	ldx #$08 				; Use X as our bit rotation counter.
-@__dump_bits_loop:
-	lda $4016
-	lsr A 					; Move bit 0 in A into Carry.
-	rol buttons 			; Move Carry into bit 0 in 'buttons'.
-	dex 
-	bne @__dump_bits_loop	; Do this until Zero flag is set.
-
-	; Now we have our controller status stored in 'buttons', we are done.
+;	ldx #$08 				; Use X as our bit rotation counter.
+;@__dump_bits_loop:
+;	lda $4016
+;	lsr A 					; Move bit 0 in A into Carry.
+;	rol buttons 			; Move Carry into bit 0 in 'buttons'.
+;	dex 
+;	bne @__dump_bits_loop	; Do this until Zero flag is set.
+;
+;	; Now we have our controller status stored in 'buttons', we are done.
 
 	pla 			; Pop X then A off stock
 	tax 
@@ -161,111 +160,10 @@ player_y:			.res 1 		; Player y-coordinate
 .endmacro
 
 
-;
-; Set the params for finding the tile in 
-; nametable at point (x, y).
-; 
-; Params: 
-;	add_x - value to add to X position.
-;	add_y - value to add to Y position.
-;
-.macro tile add_x, add_y
-	lda ball_x
-	adc add_x
-	sta $00 			; Param for X-coordinate in get_tile
-	lda ball_y
-	adc add_y
-	sta $01 			; Param for Y-coordinate in get_tile
-	jsr get_tile
-.endmacro
-
-
-;
-; Store a single 16-bit value in zero-page.
-;
-; Params:
-;	value - the 16-bit value to store.
-;
-.macro addr value 
-	pha
-	lda #.LOBYTE(value)
-	sta $00
-	lda #.HIBYTE(value) 
-	sta $01
-	pla
-.endmacro
-
-
-;
-; Store two 16-bit values in zero-page.
-; 
-; Params:
-;	v1 - the first 16-bit value to store.
-;	v2 - the second 16-bit value to store.
-.macro addr2 v1, v2
-	pha
-	lda #.LOBYTE(v1)
-	sta $00
-	lda #.HIBYTE(v1)
-	sta $01
-	lda #.LOBYTE(v2)
-	sta $02
-	lda #.HIBYTE(v2)
-	sta $03
-	pla
-.endmacro
-
-
-;
-; Load the specified attribute table. (??? - verify)
-;
-; Params:
-;	label - the name of the attribute table to laod.
-;
-.macro load_attrs label
-.scope
-	vram #$23, #$c0
-	ldx #$00
-@__load_attrs_loop:	
-	lda label, x
-	sta $2007
-	inx
-	cpx #$40
-	bne @__load_attrs_loop
-.endscope
-.endmacro
-
-
-;
-; Get the block row. (??? - verify)
-; (Not sure whether "block_row" refers to
-;  row # of blocks that are hit by ball or
-;  a "block" or tile in namespace or pattern table.)
-;
-.macro block_row hi, lo
-.scope
-	vram hi, lo
-	ldx #$0e
-@__block_row_loop:
-	lda #$42
-	sta $2007
-	lda #$43
-	sta $2007
-	dex
-	bne @__block_row_loop
-.endscope
-.endmacro
-
-
 ;;;;;;;;;;;;;; Main Program ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 main:
 	; Load the default palette
 	jsr load_palette
-
-	; Set the game state to the title screen
-	lda #GameState::PLAYING
-	sta $00 		; Param for change_state - reflects initial game state
-	jsr change_state
 
 	; Reset VRAM address
 	vram #0, #0
@@ -276,11 +174,8 @@ forever:
 
 ;;;;;;;;;;;;;; Game Loop (NMI) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 game_loop:
-	lda game_state
-
-@play:	
-	cmp #GameState::PLAYING
-	;bne @pause
+	jsr clear_sprites
+	jsr load_sprites
 	jsr play_loop
 	jmp cleanup
 
@@ -303,43 +198,20 @@ play_loop:
 
 	; A - Make the Cap'n jump
 button_a:
-	lda buttons
-	and #%10000000
-	beq @no_button_pressed
-	
+	lda #$01
+	and $4016
+	beq @return 
+	lda #$01 
+	sta player_y
 
-@no_button_pressed:
-
+@return: 
 	rts
-
-
-;
-; Sets the game state
-;
-; Params:
-;	$00 - The state to set
-;
-;change_state:
-;	; Store the new game state
-;	lda $00
-;	sta game_state
-;
-;@title:	cmp #GameState::TITLE
-;	bne @new_game
-;
-;@return:
-;	rts
-
-
-;
-;
-
 
 
 ;;;;;;;;;;;;;; Drawing Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; 
-; Clear sprite memory 
+;
+; Clear sprite memory
 ;
 clear_sprites:
 	lda #$ff
@@ -352,26 +224,18 @@ clear_sprites:
 
 
 ;
-; Clear nametable memory
+; Load sprites into sprite memory
 ;
-clear_nametable:
-	ldx #$00
-	ldy #$04
-	lda #$FF
-	vram #$20, #$00
+;
+load_sprites:
+	ldx #$00 			; Start at 0
 @loop:	
-	sta $2007
-	inx
-	bne @loop
-	dey
-	bne @loop
+	lda sprites, x 		; Load data from address (sprites + x)
+	sta $0200, x 		; Store data into RAM address ($200 + x)
+	inx 
+	cpx #$0f  			; Compare X to max number of sprite bytes to load (4 x # of sprites)
+	bne @loop 			; Keep loading into RAM until all tiles are loaded
 	rts
-
-
-;
-; Draw off-screen part of level
-;
-
 
 
 ;;;;;;;;;;;;;; Lookup & Math Subroutines ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -385,41 +249,33 @@ palette:
 	.byte $0f, $00, $10, $20
 	.byte $0f, $09, $19, $29
 	.byte $0f, $20, $10, $00
-
 	; Sprites
 	.byte $0f, $00, $08, $10
 	.byte $0f, $06, $16, $27
 	.byte $0f, $00, $00, $00
 	.byte $0f, $00, $00, $00
 
+
+; Each sprite has 4 bytes of data assinged to it:
+; vertical position, tile #, tile attributes, and horizontal position.
+; Y-pos:   $00 is the top of the screen, > $EF is off the bottom of screen.
+; Tile:	   tile number (0 - 256) for the graphic to be taken from pattern table.
+; Attr.s:  color and displaying info (mirroring, priority, palette).
+; X-pos:   $00 is left side of screen, > $F9 is off right of screen.
+; To edit Sprite 0, change bytes $0200-0203; Sprite 1 is $0204-0207, etc.
 sprites:
-	; Cap'n Tar (sprite 0)
-	.byte (PADDLE_Y - $08), $4a, %00000001, $7c
-
-	; Paddle
-	.byte PADDLE_Y, $40, %00000000, $70
-	.byte PADDLE_Y, $41, %00000000, $78
-	.byte PADDLE_Y, $41, %01000000, $80
-	.byte PADDLE_Y, $40, %01000000, $88
-
-	; Lives Row Ball
-	.byte $07, $4a, %00000001, $0e
-
-level_attr:
-	.byte $0f, $0f, $0f, $0f, $0f, $0f, $0f, $0f
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
-	.byte $84, $a5, $a5, $a5, $a5, $a5, $a5, $21
+	;      Y,   T,   A,   X
+	; Sprite 0 - Cap'n Tar
+	.byte $80, $00, $00, $80		; Capn's left head half
+	.byte $80, $01, $00, $88		; Capn's right head half
+	.byte $88, $02, $00, $80		; Capn's left leg
+	.byte $88, $03, $00, $88		; Capn's right leg
 
 
 ;;;;;;;;;;;;;; Strings ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-title_text:		.asciiz "CAP'N TAR" 
-game_over_text:	.asciiz "GAME OVER"
+;title_text:		.asciiz "CAP'N TAR" 
+;game_over_text:	.asciiz "GAME OVER"
 
 
 ;;;;;;;;;;;;;; BCD Constants ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -429,13 +285,13 @@ game_over_text:	.asciiz "GAME OVER"
 
 ;;;;;;;;;;;;;; Pattern Table (CHR-ROM) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .segment "CHARS"
-;.include "include/title.s"			; $00 - $??
-;.include "include/capn.s"			; $?? - $??
+.include "include/capn.s"			; $00 - $04 (4 tiles)
 ;.include "include/enemies.s"		; $?? - $??
 ;.include "include/bosses.s"		; $?? - $??
 ;.include "include/concarne.s"		; $?? - $??
 ;.include "include/summerman.s"		; $?? - $??
 .include "include/font.s"			; $00 - $65 (101 tiles)
+;.include "include/title.s"			; $00 - $??
 
 
 ;;;;;;;;;;;;;; Vectors ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
